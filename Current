@@ -1,0 +1,273 @@
+# **Final Project Report**
+## **1. Introduction**
+An ongoing research project by UBC's Pacific Laboratory for Artificial Intelligence (PLAI) is researching the gaming behaviours of Minecraft players to improve the behaviour of characters that players interact with (called non-playable characters). Their team has provided data for the basis of this analysis. To ensure that enough data is available for the project, candidates who contribute a large amount of data must be selected to participate in the research group's trials. Hence, we aim to investigate the following question: 
+    
+"What demographic of players in the dataset are most likely to contribute a large amount of data?"
+
+To specify, we will be focusing on the experience level, age, and gender of the players as the determining factors of the demographic. We realize that the appeal of a game varies based on experience, so knowing the experience level of players who play the most helps recruitment efforts. Players of different ages also respond differently to visuals and promotional language used in recruitment, allowing ads to target by age. Participants who are likely to contribute large amounts of data will be based on the amount of time spent gaming, where more hours spent playing equates to more data.
+
+### **Dataset Description**
+Frank Wood's research group provided all available data by monitoring their Minecraft server and recording in-game actions. We will be using the players.csv dataset for this analysis. It includes 196 total observations and 9 variables, of which age and played_hours are quantitative variables, while the rest are categorical variables. Figure 1.1 below describes the contents of the dataset:
+
+| Variable| Description |
+| --- | --- |
+| experience | level of gaming experience (Amateur, Beginner, Regular, Pro, Veteran)|
+| subscribe | subscription status (True or False)|
+| hashedEmail | encrypted email |
+| played_hours |time played (in hours)|
+| name |name of player|
+| gender | gender of players (Male, Female, Non-binary, Two-spirited, etc.)|
+| age | age of players (in years) |
+| individualId | ID of player |
+| organizationName | organization of player |
+
+Figure 1.1: Variables and Descriptions
+    
+## **2. Method and Results**
+We began by reading the dataset and wrangling the data into a tidy format before the analysis. Although there are 9 total variables in the dataset, the hashedEmail and individualId variables include no observations, so they were omitted from our analysis during the preliminary processing. 
+
+Next, summary statistics such as the mean, median, and standard deviations for the dataset were determined, and simple visualizations were created to gain further insight into the data. 
+
+Finally, a KNN-regression analysis was performed with age and the level of experience as the predictor variables and played_hours as the response variable. As the KNN model is based on Euclidean distances, it could not be applied directly to the level of experience since the variable is categorical. Instead, a dictionary with 'dummy variables' was created and assigned to the different levels of experience to represent each value numerically (i.e. 1 for beginner, 5 for veteran). The dataset is split into 75% training and 25% testing subsets to perform the KNN-regression analysis, where the KNN-regression model was trained using cross-validation with the training subset to determine the optimal k-value and then evaluated with the testing data. Predictions resulting from the model were plotted and analyzed to determine an ultimate conclusion about the demographic of players that are predicted to spend the most time playing in response to our initial research question.
+
+### **Preliminary Data Processing**
+#### **1. Import Relevant Packages**
+# Importing all packages needed for data processing, visualization, and following analysis
+
+import altair as alt
+import numpy as np
+import pandas as pd
+#### **2. Load Dataset**
+# Loading read_csv dataset for processing.
+
+player_data = pd.read_csv("playersdata/players.csv")
+player_data
+Figure 2.1: Raw Players Data
+
+#### **3. Cleaning and Wrangling**
+# Only keep relevant variables by dropping columns that contain no observations.
+
+player_tidy= player_data.drop(columns=['individualId', 'organizationName'])
+player_tidy
+Figure 2.2: Tidied Players Data
+
+#### **4. Summary Statistics**
+# Determining the mean, median, and standard deviations for the played hours for each variable: experience, gender, and age.
+
+experience_aggregated = player_tidy.groupby("experience")["played_hours"].agg(
+    ["mean", "median", "std"]
+).reset_index()
+
+experience_aggregated.rename(columns = {
+    "mean" : "playedhours_mean", "median" : "playedhours_median", "std" : "playedhours_std"
+})
+Figure 2.3: Experience Summary Values
+gender_aggregated = player_tidy.groupby("gender")["played_hours"].agg(
+    ["mean", "median", "std"]
+).reset_index()
+
+gender_aggregated.rename(columns = {
+    "mean" : "playedhours_mean", "median" : "playedhours_median", "std" : "playedhours_std"
+})
+Figure 2.4: Experience Summary Values
+age_aggregated = player_tidy.groupby("age")["played_hours"].agg(
+    ["mean", "median", "std"]
+).reset_index()
+
+age_aggregated.rename(columns = {
+    "mean" : "playedhours_mean", "median" : "playedhours_median", "std" : "playedhours_std"
+})
+Figure 2.3: Age Summary Values
+
+Simple observations of the mean and variance show that values in experience and gender variables are within a reasonable range while possible outliers exist for the age variable. Purely based on the summary statistics, we would expect regular players within the range of 14 to 20 years old to be the greatest contributors of data due to the highest mean played hours. However, this is only derived from the exploratory analysis to fain greater understanding of the data and does not take into account the number of observations in each category, demonstrating the need for further analysis in order to form concrete conclusions.
+
+### **Preliminary Data Visualization**
+#### **1. Visualizing Numerical Variables**
+
+In order to explore the possible relationship between the age and played_hours variables, a scatterplot was used to visualize the distribution of the data points. The scatterplot shows no distinct trends or relationships, although it seems that most of the participants are between the ages of 15-25 years old and played for less that 20 hours each. This was determined from how most of the datapoints are clustered along the bottom of the graph.
+age_plot= alt.Chart(player_tidy, title = "Age vs. Hours Played").mark_point(opacity=0.4).encode(
+    x= alt.X('age', axis=alt.Axis(tickCount=5)).title('Age'),
+    y= alt.Y('played_hours').title('Time Played (hrs)'),
+    color=alt.Color('played_hours', scale=alt.Scale(scheme='category20b')
+).title("Hours Played")).properties(
+        width = 300,
+        height = 300
+)
+                                                                                   
+age_plot                                                                       
+Figure 2.4: Age vs. Time Played plot
+#### **2. Visualizing Categorical Variables**
+
+Bar graphs were created for Experience vs. Hours Played and Gender vs. Hours Played to show any major variations among categories that could help provide a basis for our final prediction and analysis. Observation of the Experience vs. Hours Played plot suggests that players with regular gaming experience had a greater average number of hours played. The Gender vs. Hours Played plot shows that participants who are non-binary had the most hours played on average. However, this may not be representative as the mean data was graphed instead of raw data to prevent major gaps in data. Doing so only determines the average and does not account for the number of participants in each category.
+experience_aggregated = player_tidy.groupby("experience")["played_hours"].mean().reset_index()
+
+experience_plot= alt.Chart(experience_aggregated, title = "Experience Level vs. Hours Played").mark_bar().encode(
+    x= alt.X('experience').title('Experience Level'),
+    y= alt.Y('played_hours').title('Time Played (hrs)'),
+    color=alt.Color('experience', legend=alt.Legend(title='Experience'), scale=alt.Scale(scheme='lightmulti'))
+).properties(
+        width = 200,
+        height = 300
+).configure_axis(
+    labelAngle=-45
+)
+                                                                                   
+experience_plot   
+Figure 2.5: Experience vs. Time Played plot
+gender_aggregated = player_tidy.groupby("gender")["played_hours"].mean().reset_index()
+
+gender_plot= alt.Chart(gender_aggregated, title = "Gender vs. Hours Played").mark_bar().encode(
+    x= alt.X('gender').title('Gender'),
+    y= alt.Y('played_hours').title('Time Played (hrs)'),
+    color=alt.Color('gender', legend=alt.Legend(title='Gender'), scale=alt.Scale(scheme='lightmulti')
+)).properties(
+        width = 200,
+        height = 300
+).configure_axis(
+    labelAngle=-45
+)
+                                                                                   
+gender_plot
+Figure 2.6: Gender vs. Time Played plot
+# Visualizing the gender distribution across experience levels using raw data
+
+experience_gendered_plot= alt.Chart(player_tidy, title = "Experience and Gender vs. Time Played").mark_bar().encode(
+    x= alt.X('experience').title('Player Experience'),
+    y= alt.Y('played_hours').title('Time Played (hrs)'),
+    color=alt.Color('gender', legend=alt.Legend(title='Gender'), scale=alt.Scale(scheme='lightmulti')
+)).properties(
+        width = 200,
+        height = 300
+).configure_axis(
+    labelAngle=-45
+)
+
+experience_gendered_plot
+Figure 2.7: Experience and Gender vs. Time Played Plot
+### **Analysis Model**
+# # Importing additional packages needed for performing a KNN Regression
+
+import matplotlib.pyplot as plt 
+import altair as alt
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import GridSearchCV
+from sklearn.compose import make_column_transformer
+from sklearn.pipeline import make_pipeline
+from sklearn import set_config
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+player_tidy = player_data.iloc[:, [0,3,6]]
+
+new = {
+    'Veteran':5,
+    'Pro':4,
+    'Regular':3,
+    'Amateur':2,
+    'Beginner':1
+}
+
+player_tidy['experience'] = player_tidy['experience'].replace(new)
+
+player_tidy
+# Split the data sets into training and testing data
+from sklearn.model_selection import train_test_split
+
+player_train, player_test = train_test_split(
+    player_tidy, train_size=0.75,
+    random_state = 2000     # setting the random state to ensure the results are reproducible
+)
+# import the K-NN regression model
+from sklearn.neighbors import KNeighborsRegressor
+# import the K-NN regression model
+from sklearn.neighbors import KNeighborsRegressor
+
+# preprocess the data, make the pipeline
+preprocessor = make_column_transformer((StandardScaler(), ['age', 'experience']))
+pipeline = make_pipeline(preprocessor, KNeighborsRegressor())
+
+pipeline
+# Define the parameter grid for K tuning
+param_grid = {
+    'kneighborsregressor__n_neighbors': range(1,5)  # Values to test for n_neighbors
+}
+
+# Initialize GridSearchCV
+gridsearch = GridSearchCV(
+    estimator=pipeline,
+    param_grid=param_grid,
+    cv=5,  # 5-fold cross-validation
+    scoring='neg_mean_squared_error'
+)
+
+# Fit the GridSearchCV object
+gridsearch.fit(
+    player_train[['age', 'experience']],  # Features
+    player_train['played_hours']  # Outcome variable
+)
+
+# Retrieve cross-validation results
+player_results = pd.DataFrame(gridsearch.cv_results_)
+player_results['sem_test_score'] = player_results['std_test_score'] / 5**(1/2)
+player_results = (
+    player_results[[
+        'param_kneighborsregressor__n_neighbors',  # Column for n_neighbors
+        'mean_test_score',  # Mean test score
+        'sem_test_score'  # Standard error of the mean
+    ]]
+    .rename(columns={'param_kneighborsregressor__n_neighbors': 'n_neighbors'})  # Rename for clarity
+)
+
+player_results
+# k value with the lowest RMPSE
+player_results.nsmallest(1, "mean_test_score")
+player_results["mean_test_score"] = -player_results["mean_test_score"]
+player_results
+# Find the optimal K value (representing the number of nearest neighbours) for the data set
+
+gridsearch.best_params_
+from sklearn.metrics import mean_squared_error
+
+# Create a new column with the predicted values on the testing data set
+
+player_test["predicted"] = gridsearch.predict(player_test)
+
+player_test
+# Calculate the root mean square prediction error for the test set
+
+RMSPE_test = mean_squared_error(
+    y_true=player_test["played_hours"],
+    y_pred=player_test["predicted"]
+)**(1/2)
+
+RMSPE_test
+# Create a grid of evenly spaced values for both 'age' and 'experience'
+age_prediction_grid = pd.DataFrame({
+    "age": player_tidy['age'],
+    "experience": player_tidy['experience']
+})
+
+# Predict played hours for each combination in the grid
+age_prediction_grid["predicted"] = gridsearch.predict(age_prediction_grid)
+
+# Base plot: scatter plot of actual player data
+base_plot = alt.Chart(player_tidy, title="Experience vs Predicted Hours Played").mark_circle(opacity=0.4).encode(
+    x=alt.X("age", scale=alt.Scale(zero=False), title="Age"),
+    y=alt.Y("played_hours", scale=alt.Scale(domain=[1, 250]), axis=alt.Axis(tickCount=20, format=",.0f"), title="Hours Played"),
+    color=alt.Color('experience:N')
+)
+
+# Add the predictions as a line
+predictions_plot = base_plot + alt.Chart(age_prediction_grid).mark_line(color="red", opacity=0.5).encode(
+    x="age",
+    y="predicted"
+).interactive()
+
+# Display the final plot
+predictions_plot
+### **Discussion**
+
+#### **1. Visualization Analysis**
+
+Considering the bar graph between experience level and time played, players with a 'Regular' experience level logged the most playing hours. This graph was based on mean played hours, showing that this experience level's playing time was a mean of over 18 hours; this was a significantly higher mean than the amateur level, who logged a mean of 6 played hours. Additionally, Figure 2.6 shows the graph of the mean played hours for players of different genders. The visualization revealed that players who are non-binary and female have the highest mean time played, logging about 14.8 and 10.7 hours, respectively. These two visualizations were combined in Figure 2.7, which used the raw data to show the distribution of genders within each experience level. The bar graph shows the same trend, in which individuals with regular experience log the most hours, followed by amateurs. Within the regular experience level, it was mainly composed of female, male, and non-binary players fairly evenly distributed. Similarly, the amateur players mostly identified as male or female. These visualizations communicate that the people with the most hours are logged by regular-experience players who are male, female, and non-binary.
+
+#### **2. KNN Regression Analysis**
